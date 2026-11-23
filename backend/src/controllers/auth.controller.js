@@ -2,23 +2,54 @@ const User = require('../models/user.model');
 const bcrypt = require("bcrypt");
 const generateToken = require('../utils/generatetoken')
 const mongoose = require('mongoose')
+const crypto = require("crypto");
+
+
+
+const generatePassword = () => {
+    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const special = "@#$!%&*";
+    const all = letters + numbers + special;
+
+    let password = [
+        letters[crypto.randomInt(letters.length)],
+        numbers[crypto.randomInt(numbers.length)],
+        special[crypto.randomInt(special.length)]
+    ];
+
+    while (password.length < 8) {
+        password.push(all[crypto.randomInt(all.length)]);
+    }
+
+    return password.join("");
+};
+
 
 const register = async (req, res) => {
     try {
         const {
             name,
             email,
-            password,
             role,
             department,
             policyTier,
-            reportingManager
+            reportingManager,
+            status
         } = req.body;
 
 
-        if (!name || !email || !password || !department) {
+        if (!name || !email || !department || !status) {
             return res.status(400).json({
                 message: "All required fields must be provided"
+            });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                message: "Please enter a valid email address"
             });
         }
 
@@ -31,6 +62,44 @@ const register = async (req, res) => {
         if (userExist) {
             return res.status(409).json({
                 message: "User already exists"
+            });
+        }
+
+        const password = generatePassword()
+
+        if (typeof password !== "string") {
+            return res.status(400).json({
+                message: "Password is required"
+            });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({
+                message: "Password must contain minimum 6 characters"
+            });
+        }
+
+        if (!/[A-Za-z]/.test(password)) {
+            return res.status(400).json({
+                message: "Password must contain at least 1 alphabet"
+            });
+        }
+
+        if (!/[0-9]/.test(password)) {
+            return res.status(400).json({
+                message: "Password must contain at least 1 number"
+            });
+        }
+
+        if (!/[^A-Za-z0-9\s]/.test(password)) {
+            return res.status(400).json({
+                message: "Password must contain at least 1 special character"
+            });
+        }
+
+        if (/\s/.test(password)) {
+            return res.status(400).json({
+                message: "Password must not contain spaces"
             });
         }
 
@@ -62,43 +131,45 @@ const register = async (req, res) => {
                 status: "Active"
             });
         }
-    
 
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+
+        const hashedPassword = await bcrypt.hash(password, 10);
 
 
-    const user = await User.create({
-        name,
-        email,
-        password: hashedPassword,
-        role: role || "Employee",
-        department,
-        policyTier: policyTier || "Tier 3",
-        reportingManager: reportingManager || null
-    });
+        const user = await User.create({
+            name,
+            email,
+            password: hashedPassword,
+            role: role || "Employee",
+            department,
+            policyTier: policyTier || "Tier 3",
+            reportingManager: reportingManager || null
+        });
 
-    return res.status(201).json({
-        message: "User registered successfully",
-        user: {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            department: user.department,
-            policyTier: user.policyTier,
-            reportingManager: role === "Employee" ? reportingManager : null
-        }
-    });
+        return res.status(201).json({
+            message: "User registered successfully",
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                department: user.department,
+                policyTier: user.policyTier,
+                reportingManager: role === "Employee" ? reportingManager : null
+            }
+        });
 
-} catch (error) {
-    console.error("Register Error:", error);
+    } catch (error) {
+        console.error("Register Error:", error);
 
-    return res.status(500).json({
-        message: "Failed to register user"
-    });
-}
+        return res.status(500).json({
+            message: "Failed to register user"
+        });
+    }
 };
+
+
 
 
 const login = async (req, res) => {
@@ -112,6 +183,14 @@ const login = async (req, res) => {
             });
         }
 
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({
+                message: "Please enter a valid email address"
+            });
+        }
+
 
         const user = await User.findOne({
             email: email.trim().toLowerCase()
@@ -119,7 +198,7 @@ const login = async (req, res) => {
 
         if (!user) {
             return res.status(401).json({
-                message: "Invalid email"
+                message: "User does not exist"
             });
         }
 
