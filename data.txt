@@ -1,0 +1,5 @@
+PORT = `3000`
+MONGO_URI = "mongodb+srv://idedenroy_db_user:askan@cluster1.hbtio9r.mongodb.net/TravelFlow"
+JWT_SECRET = "ce8e328b7fbebacfc254dff4694b5e4248e9529c9575ada84595750283364953"
+ADMIN_EMAIL=admin@gmail.com
+ADMIN_PASSWORD=Admin@123
