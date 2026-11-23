@@ -6,6 +6,7 @@ const crypto = require("crypto");
 
 
 
+
 const generatePassword = () => {
     const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     const numbers = "0123456789";
@@ -24,6 +25,7 @@ const generatePassword = () => {
 
     return password.join("");
 };
+
 
 
 const register = async (req, res) => {
@@ -97,11 +99,8 @@ const register = async (req, res) => {
             });
         }
 
-        if (/\s/.test(password)) {
-            return res.status(400).json({
-                message: "Password must not contain spaces"
-            });
-        }
+        console.log("password : ",password)
+
 
         const allowedRoles = ["Employee", "Manager", "Finance"];
 
@@ -201,6 +200,39 @@ const login = async (req, res) => {
                 message: "User does not exist"
             });
         }
+
+
+        if (typeof password !== "string") {
+            return res.status(400).json({
+                message: "Password is required"
+            });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({
+                message: "Password must contain minimum 6 characters"
+            });
+        }
+
+        if (!/[A-Za-z]/.test(password)) {
+            return res.status(400).json({
+                message: "Password must contain at least 1 alphabet"
+            });
+        }
+
+        if (!/[0-9]/.test(password)) {
+            return res.status(400).json({
+                message: "Password must contain at least 1 number"
+            });
+        }
+
+        if (!/[^A-Za-z0-9\s]/.test(password)) {
+            return res.status(400).json({
+                message: "Password must contain at least 1 special character"
+            });
+        }
+
+
 
 
         const isMatch = await bcrypt.compare(
