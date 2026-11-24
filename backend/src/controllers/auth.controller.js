@@ -1,172 +1,6 @@
 const User = require('../models/user.model');
 const bcrypt = require("bcrypt");
 const generateToken = require('../utils/generatetoken')
-const mongoose = require('mongoose')
-const crypto = require("crypto");
-
-
-
-
-const generatePassword = () => {
-    const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    const numbers = "0123456789";
-    const special = "@#$!%&*";
-    const all = letters + numbers + special;
-
-    let password = [
-        letters[crypto.randomInt(letters.length)],
-        numbers[crypto.randomInt(numbers.length)],
-        special[crypto.randomInt(special.length)]
-    ];
-
-    while (password.length < 8) {
-        password.push(all[crypto.randomInt(all.length)]);
-    }
-
-    return password.join("");
-};
-
-
-
-const register = async (req, res) => {
-    try {
-        const {
-            name,
-            email,
-            role,
-            department,
-            policyTier,
-            reportingManager,
-            status
-        } = req.body;
-
-
-        if (!name || !email || !department || !status) {
-            return res.status(400).json({
-                message: "All required fields must be provided"
-            });
-        }
-
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({
-                message: "Please enter a valid email address"
-            });
-        }
-
-
-        const userExist = await User.findOne({
-            email: email.trim().toLowerCase()
-        });
-
-
-        if (userExist) {
-            return res.status(409).json({
-                message: "User already exists"
-            });
-        }
-
-        const password = generatePassword()
-
-        if (typeof password !== "string") {
-            return res.status(400).json({
-                message: "Password is required"
-            });
-        }
-
-        if (password.length < 6) {
-            return res.status(400).json({
-                message: "Password must contain minimum 6 characters"
-            });
-        }
-
-        if (!/[A-Za-z]/.test(password)) {
-            return res.status(400).json({
-                message: "Password must contain at least 1 alphabet"
-            });
-        }
-
-        if (!/[0-9]/.test(password)) {
-            return res.status(400).json({
-                message: "Password must contain at least 1 number"
-            });
-        }
-
-        if (!/[^A-Za-z0-9\s]/.test(password)) {
-            return res.status(400).json({
-                message: "Password must contain at least 1 special character"
-            });
-        }
-
-        console.log("password : ",password)
-
-
-        const allowedRoles = ["Employee", "Manager", "Finance"];
-
-        if (role && !allowedRoles.includes(role)) {
-            return res.status(400).json({
-                message: "Invalid role"
-            });
-        }
-
-        if (role === "Employee") {
-
-            if (!reportingManager) {
-                return res.status(400).json({
-                    message: "Please provide Reporting Manager id"
-                });
-            }
-
-            if (!mongoose.isValidObjectId(reportingManager)) {
-                return res.status(400).json({
-                    message: "Invalid Reporting Manager ID"
-                });
-            }
-
-            const reportingManagerExist = await User.findOne({
-                _id: reportingManager,
-                role: "Manager",
-                status: "Active"
-            });
-        }
-
-
-
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-
-        const user = await User.create({
-            name,
-            email,
-            password: hashedPassword,
-            role: role || "Employee",
-            department,
-            policyTier: policyTier || "Tier 3",
-            reportingManager: reportingManager || null
-        });
-
-        return res.status(201).json({
-            message: "User registered successfully",
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                department: user.department,
-                policyTier: user.policyTier,
-                reportingManager: role === "Employee" ? reportingManager : null
-            }
-        });
-
-    } catch (error) {
-        console.error("Register Error:", error);
-
-        return res.status(500).json({
-            message: "Failed to register user"
-        });
-    }
-};
 
 
 
@@ -278,7 +112,79 @@ const login = async (req, res) => {
 };
 
 
+const logout = async (req, res) => {
+    try {
+        return res.status(200).json({
+            message: "Logout Successful"
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            message: "Logout Failed"
+        });
+    }
+};
+
+
+const changePassword = async (req, res) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+
+        if (!oldPassword || !newPassword) {
+            return res.status(400).json({
+                message: "All fields are required"
+            });
+        }
+
+        const passwordRegex = /^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/;
+
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({
+                message: "Password must contain minimum 8 characters, 1 alphabet, 1 number and 1 special character"
+            });
+        }
+
+        const user = await userModel.findById(req.user.id).select("+password");
+
+        if (!user) {
+            return res.status(404).json({
+                message: "User not found"
+            });
+        }
+
+        const isMatch = await bcrypt.compare(oldPassword, user.password);
+
+        if (!isMatch) {
+            return res.status(400).json({
+                message: "Old password is incorrect"
+            });
+        }
+
+        if (oldPassword === newPassword) {
+            return res.status(400).json({
+                message: "New password must be different from old password"
+            });
+        }
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        user.password = hashedPassword;
+
+        await user.save();
+
+        return res.status(200).json({
+            message: "Password Changed Successfully"
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            message: "Failed to change password"
+        });
+    }
+};
+
+
 module.exports = {
-    register,
-    login
+    login,
+    logout
 };
